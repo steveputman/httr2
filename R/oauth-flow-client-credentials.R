@@ -26,12 +26,14 @@
 req_oauth_client_credentials <- function(req,
                                          client,
                                          scope = NULL,
-                                         token_params = list()) {
+                                         token_params = list(),
+					 curl_opts = list()) {
 
   params <- list(
     client = client,
     scope = scope,
-    token_params = token_params
+    token_params = token_params,
+    curl_opts = curl_opts
   )
 
   cache <- cache_mem(client, NULL)
@@ -42,12 +44,14 @@ req_oauth_client_credentials <- function(req,
 #' @rdname req_oauth_client_credentials
 oauth_flow_client_credentials <- function(client,
                                           scope = NULL,
-                                          token_params = list()) {
+                                          token_params = list(),
+					  curl_opts = list()) {
   oauth_flow_check("client credentials", client, is_confidential = TRUE)
 
   oauth_client_get_token(client,
     grant_type = "client_credentials",
     scope = scope,
+    curl_opts = curl_opts,
     !!!token_params
   )
 }
