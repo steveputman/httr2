@@ -10,7 +10,7 @@ req_oauth_client_credentials(req, client, scope = NULL, token_params = list())
 oauth_flow_client_credentials(client, scope = NULL, token_params = list())
 }
 \arguments{
-\item{req}{A \link{request}.}
+\item{req}{A httr2 \link{request} object.}
 
 \item{client}{An \code{\link[=oauth_client]{oauth_client()}}.}
 
@@ -28,7 +28,8 @@ Authenticate using OAuth \strong{client credentials flow}, as defined by
 \href{https://datatracker.ietf.org/doc/html/rfc6749#section-4.4}{Section 4.4 of RFC 6749}. It is used to allow the client to access resources that
 it controls directly, not on behalf of an user.
 
-Learn more about the overall OAuth authentication flow in \code{vignette("oauth")}.
+Learn more about the overall OAuth authentication flow in
+\url{https://httr2.r-lib.org/articles/oauth.html}.
 }
 \examples{
 req_auth <- function(req) {
@@ -46,6 +47,7 @@ Other OAuth flows:
 \code{\link{req_oauth_auth_code}()},
 \code{\link{req_oauth_bearer_jwt}()},
 \code{\link{req_oauth_password}()},
-\code{\link{req_oauth_refresh}()}
+\code{\link{req_oauth_refresh}()},
+\code{\link{req_oauth_token_exchange}()}
 }
 \concept{OAuth flows}

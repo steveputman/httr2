@@ -5,7 +5,9 @@ test_that("req_stream() is deprecated", {
   )
 })
 
-test_that("returns empty body; sets last request & response", {
+# req_perform_stream() --------------------------------------------------------
+
+test_that("returns stream body; sets last request & response", {
   req <- request_test("/stream-bytes/1024")
   resp <- req_perform_stream(req, function(x) NULL)
   expect_s3_class(resp, "httr2_response")
@@ -46,7 +48,7 @@ test_that("can override error handling", {
 test_that("can buffer to lines", {
   lines <- character()
   accumulate_lines <- function(x) {
-    lines <<- c(lines, strsplit(rawToChar(x), "\n")[[1]])
+    lines <<- c(lines, strsplit(rawToChar(x), "\n", fixed = TRUE)[[1]])
     TRUE
   }
 

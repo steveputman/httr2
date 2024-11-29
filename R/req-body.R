@@ -11,9 +11,7 @@
 #' Adding a body to a request will automatically switch the method to POST.
 #'
 #' @inheritParams req_perform
-#' @param type MIME content type. You shouldn't generally need to specify this as
-#'  the defaults are usually pretty good, e.g. `req_body_file()` will guess it
-#'  from the extension of of `path`. Will be ignored if you have manually set
+#' @param type MIME content type. Will be ignored if you have manually set
 #'  a `Content-Type` header.
 #' @returns A modified HTTP [request].
 #' @examples
@@ -61,7 +59,12 @@ req_body_raw <- function(req, body, type = NULL) {
     cli::cli_abort("{.arg body} must be a raw vector or string.")
   }
 
-  req_body(req, data = body, type = "raw", content_type = type %||% "")
+  req_body(
+    req,
+    data = body,
+    type = "raw",
+    content_type = type %||% ""
+  )
 }
 
 #' @export
@@ -74,7 +77,12 @@ req_body_file <- function(req, path, type = NULL) {
   }
 
   # Need to override default content-type "application/x-www-form-urlencoded"
-  req_body(req, data = new_path(path), type = "raw-file", content_type = type %||% "")
+  req_body(
+    req,
+    data = new_path(path),
+    type = "raw-file",
+    content_type = type %||% ""
+  )
 }
 
 #' @export
@@ -102,7 +110,13 @@ req_body_json <- function(req, data,
     null = null,
     ...
   )
-  req_body(req, data = data, type = "json", content_type = type, params = params)
+  req_body(
+    req,
+    data = data,
+    type = "json",
+    content_type = type,
+    params = params
+  )
 }
 
 #' @export
@@ -164,7 +178,17 @@ req_body_multipart <- function(.req, ...) {
 
 # General structure -------------------------------------------------------
 
-req_body <- function(req, data, type, content_type, params = list()) {
+req_body <- function(req, data, type, content_type, params = list(), error_call = parent.frame()) {
+  if (!is.null(req$body) && req$body$type != type) {
+    cli::cli_abort(
+      c(
+        "Can't change body type from {req$body$type} to {type}.",
+        i = "You must use only one type of `req_body_*()` per request."
+      ),
+      call = error_call
+    )
+  }
+
   req$body <- list(
     data = data,
     type = type,
@@ -193,6 +217,22 @@ req_body_info <- function(req) {
   }
 }
 
+req_body_get <- function(req) {
+  if (is.null(req$body)) {
+    return("")
+  }
+  switch(
+    req$body$type,
+    raw = req$body$data,
+    form = {
+      data <- unobfuscate(req$body$data)
+      query_build(data)
+    },
+    json = exec(jsonlite::toJSON, req$body$data, !!!req$body$params),
+    cli::cli_abort("Unsupported request body type {.str {req$body$type}}.")
+  )
+}
+
 req_body_apply <- function(req) {
   if (is.null(req$body)) {
     return(req)
@@ -203,48 +243,28 @@ req_body_apply <- function(req) {
 
   if (type == "raw-file") {
     size <- file.info(data)$size
-    done <- FALSE
     # Only open connection if needed
     delayedAssign("con", file(data, "rb"))
 
-    # Leaks connection if request doesn't complete
-    readfunction <- function(nbytes, ...) {
-      if (done) {
-        return(raw())
-      }
-      out <- readBin(con, "raw", nbytes)
-      if (length(out) <= nbytes) {
-        close(con)
-        done <<- TRUE
-        con <<- NULL
-      }
-      out
-    }
-    seekfunction <- function(offset, ...) {
-      if (done) {
-        con <<- file(data, "rb")
-        done <<- FALSE
-      }
-      seek(con, where = offset)
-    }
-
+    req <- req_policies(
+      req,
+      done = function() close(con)
+    )
     req <- req_options(req,
       post = TRUE,
-      readfunction = readfunction,
-      seekfunction = seekfunction,
+      readfunction = function(nbytes, ...) readBin(con, "raw", nbytes),
+      seekfunction = function(offset, ...) seek(con, where = offset),
       postfieldsize_large = size
     )
   } else if (type == "raw") {
     req <- req_body_apply_raw(req, data)
   } else if (type == "json") {
-    json <- exec(jsonlite::toJSON, data, !!!req$body$params)
-    req <- req_body_apply_raw(req, json)
+    req <- req_body_apply_raw(req, req_body_get(req))
   } else if (type == "multipart") {
     data <- unobfuscate(data)
     req$fields <- data
   } else if (type == "form") {
-    data <- unobfuscate(data)
-    req <- req_body_apply_raw(req, query_build(data))
+    req <- req_body_apply_raw(req, req_body_get(req))
   } else {
     cli::cli_abort("Unsupported request body {.arg type}.", .internal = TRUE)
   }
